@@ -1,0 +1,189 @@
+package dev.jb.logolsp
+
+import org.antlr.v4.runtime.Token
+import org.antlr.v4.runtime.tree.TerminalNode
+import org.eclipse.lsp4j.SemanticTokens
+
+class SemanticTokensProvider(
+    private val program: LogoParser.ProgramContext,
+) {
+    fun provide(): SemanticTokens {
+        val collector = TokenCollector()
+        collector.visit(program)
+        return collector.toSemanticTokens()
+    }
+
+    private class TokenCollector : LogoBaseVisitor<Unit>() {
+        private val tokens = mutableListOf<CollectedToken>()
+
+        override fun visitProgram(ctx: LogoParser.ProgramContext) {
+            visitChildren(ctx)
+        }
+
+        override fun visitProcedureDefinition(ctx: LogoParser.ProcedureDefinitionContext) {
+            emitKeyword(ctx.TO())
+            emitFunction(ctx.IDENT())
+            emitKeyword(ctx.END())
+            visitChildren(ctx)
+        }
+
+        override fun visitProcedureCall(ctx: LogoParser.ProcedureCallContext) {
+            emitFunction(ctx.IDENT())
+            visitChildren(ctx)
+        }
+
+        override fun visitVariableReference(ctx: LogoParser.VariableReferenceContext) {
+            emitVariable(ctx.start, ctx.IDENT()?.symbol)
+        }
+
+        override fun visitVariableAssignment(ctx: LogoParser.VariableAssignmentContext) {
+            emitKeyword(ctx.MAKE())
+            visitChildren(ctx)
+        }
+
+        override fun visitRepeatStatement(ctx: LogoParser.RepeatStatementContext) {
+            emitKeyword(ctx.REPEAT())
+            visitChildren(ctx)
+        }
+
+        override fun visitIfStatement(ctx: LogoParser.IfStatementContext) {
+            emitKeyword(ctx.IF())
+            visitChildren(ctx)
+        }
+
+        override fun visitIfElseStatement(ctx: LogoParser.IfElseStatementContext) {
+            emitKeyword(ctx.IFELSE())
+            visitChildren(ctx)
+        }
+
+        override fun visitPrimaryExpression(ctx: LogoParser.PrimaryExpressionContext) {
+            ctx.NUMBER()?.symbol?.let { emitNumber(it) }
+            visitChildren(ctx)
+        }
+
+        override fun visitForwardCommand(ctx: LogoParser.ForwardCommandContext) {
+            emitFunction(ctx.FORWARD())
+            visitChildren(ctx)
+        }
+
+        override fun visitBackCommand(ctx: LogoParser.BackCommandContext) {
+            emitFunction(ctx.BACK())
+            visitChildren(ctx)
+        }
+
+        override fun visitRightCommand(ctx: LogoParser.RightCommandContext) {
+            emitFunction(ctx.RIGHT())
+            visitChildren(ctx)
+        }
+
+        override fun visitLeftCommand(ctx: LogoParser.LeftCommandContext) {
+            emitFunction(ctx.LEFT())
+            visitChildren(ctx)
+        }
+
+        override fun visitPenUpCommand(ctx: LogoParser.PenUpCommandContext) {
+            emitFunction(ctx.PENUP())
+            visitChildren(ctx)
+        }
+
+        override fun visitPenDownCommand(ctx: LogoParser.PenDownCommandContext) {
+            emitFunction(ctx.PENDOWN())
+            visitChildren(ctx)
+        }
+
+        override fun visitHomeCommand(ctx: LogoParser.HomeCommandContext) {
+            emitFunction(ctx.HOME())
+            visitChildren(ctx)
+        }
+
+        override fun visitClearScreenCommand(ctx: LogoParser.ClearScreenCommandContext) {
+            emitFunction(ctx.CLEARSCREEN())
+            visitChildren(ctx)
+        }
+
+        override fun visitQuotedWord(ctx: LogoParser.QuotedWordContext) {
+            emitString(ctx.QUOTED_WORD())
+        }
+
+        private fun emitKeyword(node: TerminalNode?) {
+            emit(node, KEYWORD)
+        }
+
+        private fun emitFunction(node: TerminalNode?) {
+            emit(node, FUNCTION)
+        }
+
+        private fun emitString(node: TerminalNode?) {
+            emit(node, STRING)
+        }
+
+        private fun emitNumber(token: Token?) {
+            token ?: return
+            tokens += CollectedToken(
+                line = token.line - 1,
+                char = token.charPositionInLine,
+                length = token.text?.length ?: 0,
+                typeIndex = NUMBER,
+            )
+        }
+
+        private fun emitVariable(startToken: Token?, identToken: Token?) {
+            if (startToken == null || identToken == null) return
+            tokens += CollectedToken(
+                line = startToken.line - 1,
+                char = startToken.charPositionInLine,
+                length = (identToken.text?.length ?: 0) + 1,
+                typeIndex = VARIABLE,
+            )
+        }
+
+        private fun emit(node: TerminalNode?, typeIndex: Int) {
+            val token = node?.symbol ?: return
+            tokens += CollectedToken(
+                line = token.line - 1,
+                char = token.charPositionInLine,
+                length = token.text?.length ?: 0,
+                typeIndex = typeIndex,
+            )
+        }
+
+        fun toSemanticTokens(): SemanticTokens {
+            val sortedTokens = tokens.sortedWith(compareBy<CollectedToken> { it.line }.thenBy { it.char })
+            val data = ArrayList<Int>(sortedTokens.size * 5)
+            var previousLine = 0
+            var previousChar = 0
+
+            for (token in sortedTokens) {
+                val deltaLine = token.line - previousLine
+                val deltaChar = if (deltaLine == 0) token.char - previousChar else token.char
+                data += deltaLine
+                data += deltaChar
+                data += token.length
+                data += token.typeIndex
+                data += 0
+                previousLine = token.line
+                previousChar = token.char
+            }
+
+            return SemanticTokens(data)
+        }
+    }
+
+    private data class CollectedToken(
+        val line: Int,
+        val char: Int,
+        val length: Int,
+        val typeIndex: Int,
+    )
+
+    companion object {
+        val TOKEN_TYPES = listOf("keyword", "function", "variable", "string", "number")
+
+        private const val KEYWORD = 0
+        private const val FUNCTION = 1
+        private const val VARIABLE = 2
+        private const val STRING = 3
+        private const val NUMBER = 4
+    }
+}
+

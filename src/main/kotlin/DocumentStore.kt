@@ -22,6 +22,8 @@ data class ParsedDocument(
 class DocumentStore {
     private val documents = ConcurrentHashMap<String, ParsedDocument>()
 
+    fun get(uri: String): ParsedDocument? = documents[uri]
+
     fun open(uri: String, text: String) {
         documents[uri] = parse(text)
     }
@@ -47,7 +49,6 @@ class DocumentStore {
 
         val program = parser.program()
 
-        System.err.println("Parsed document — ${errors.size} errors")
 
         return ParsedDocument(text, program, errors)
     }
