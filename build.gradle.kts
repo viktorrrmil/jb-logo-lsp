@@ -28,6 +28,10 @@ tasks.generateGrammarSource {
     outputDirectory = file("${layout.buildDirectory.get()}/generated-src/antlr/main")
 }
 
+tasks.shadowJar {
+    mergeServiceFiles()
+}
+
 kotlin {
     sourceSets {
         main {
