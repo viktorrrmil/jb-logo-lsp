@@ -17,6 +17,7 @@ data class ParsedDocument(
     val source: String,
     val program: LogoParser.ProgramContext,
     val errors: List<SyntaxError>,
+    val symbolTable: SymbolTable,
 )
 
 class DocumentStore {
@@ -48,9 +49,9 @@ class DocumentStore {
         parser.addErrorListener(errorListener)
 
         val program = parser.program()
+        val symbolTable = SymbolTableBuilder().build(program)
 
-
-        return ParsedDocument(text, program, errors)
+        return ParsedDocument(text, program, errors, symbolTable)
     }
 
     private class CollectingErrorListener(

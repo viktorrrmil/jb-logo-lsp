@@ -1,0 +1,55 @@
+; ===== Variable Definitions =====
+MAKE "speed 5
+MAKE "size 100
+MAKE "count 4
+
+; ===== Basic Procedure =====
+TO square :side
+  REPEAT :count [
+    FORWARD :side
+    RIGHT 90
+  ]
+END
+
+; ===== Procedure with multiple params =====
+TO rectangle :width :height
+  FORWARD :width
+  RIGHT 90
+  FORWARD :height
+  RIGHT 90
+  FORWARD :width
+  RIGHT 90
+  FORWARD :height
+  RIGHT 90
+END
+
+; ===== Nested procedure calls =====
+TO draw_grid :cols :rows
+  MAKE "i 0
+  REPEAT :rows [
+    MAKE "j 0
+    REPEAT :cols [
+      square :size
+      FORWARD :size
+      MAKE "j :j + 1
+    ]
+    BACK :cols * :size
+    RIGHT 90
+    FORWARD :size
+    LEFT 90
+    MAKE "i :i + 1
+  ]
+END
+
+; ===== Conditional logic =====
+TO move_safe :dist
+  IF :dist > 0 [
+    FORWARD :dist
+  ]
+END
+
+; ===== Entry point =====
+PENDOWN
+draw_grid 3 3
+PENUP
+HOME

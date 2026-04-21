@@ -25,6 +25,8 @@ class LogoLanguageServer : LanguageServer {
         return CompletableFuture.supplyAsync {
             val capabilities = ServerCapabilities()
             capabilities.textDocumentSync = Either.forLeft(TextDocumentSyncKind.Full)
+            capabilities.declarationProvider = Either.forLeft(true)
+            capabilities.definitionProvider = Either.forLeft(true)
             capabilities.semanticTokensProvider = SemanticTokensWithRegistrationOptions(
                 SemanticTokensLegend(SemanticTokensProvider.TOKEN_TYPES, emptyList()),
                 true,
