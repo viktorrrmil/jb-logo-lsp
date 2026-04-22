@@ -4,6 +4,7 @@ import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams
 import org.eclipse.lsp4j.InitializeParams
 import org.eclipse.lsp4j.InitializeResult
+import org.eclipse.lsp4j.RenameOptions
 import org.eclipse.lsp4j.SemanticTokensLegend
 import org.eclipse.lsp4j.SemanticTokensWithRegistrationOptions
 import org.eclipse.lsp4j.ServerCapabilities
@@ -27,6 +28,7 @@ class LogoLanguageServer : LanguageServer {
             capabilities.textDocumentSync = Either.forLeft(TextDocumentSyncKind.Full)
             capabilities.declarationProvider = Either.forLeft(true)
             capabilities.definitionProvider = Either.forLeft(true)
+            capabilities.renameProvider = Either.forRight(RenameOptions(true))
             capabilities.semanticTokensProvider = SemanticTokensWithRegistrationOptions(
                 SemanticTokensLegend(SemanticTokensProvider.TOKEN_TYPES, emptyList()),
                 true,
