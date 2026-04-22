@@ -49,7 +49,7 @@ class LogoTextDocumentService(
 
     override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
         val document = store.get(params.textDocument.uri)
-        val tokens = document?.let { SemanticTokensProvider(it.program).provide() }
+        val tokens = document?.let { SemanticTokensProvider(it.program, it.source).provide() }
             ?: SemanticTokens(emptyList())
         return CompletableFuture.completedFuture(tokens)
     }

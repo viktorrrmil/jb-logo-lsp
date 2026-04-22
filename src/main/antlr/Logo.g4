@@ -197,7 +197,7 @@ IDENT
     ;
 
 COMMENT
-    : ';' ~[\r\n]* -> skip
+    : ';' ~[\r\n]* -> channel(HIDDEN)
     ;
 
 NEWLINE : [\r\n]+ -> skip ;

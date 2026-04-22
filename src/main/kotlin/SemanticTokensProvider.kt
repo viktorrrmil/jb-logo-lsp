@@ -6,10 +6,12 @@ import org.eclipse.lsp4j.SemanticTokens
 
 class SemanticTokensProvider(
     private val program: LogoParser.ProgramContext,
+    private val source: String,
 ) {
     fun provide(): SemanticTokens {
         val collector = TokenCollector()
         collector.visit(program)
+        collector.collectComments(source)
         return collector.toSemanticTokens()
     }
 
@@ -105,6 +107,31 @@ class SemanticTokensProvider(
             emitVariableFromQuoted(ctx.QUOTED_WORD())
         }
 
+        fun collectComments(source: String) {
+            var lineIndex = 0
+            var lineStart = 0
+            while (lineStart <= source.length) {
+                val lineEnd = source.indexOfAny(charArrayOf('\r', '\n'), startIndex = lineStart).let { if (it == -1) source.length else it }
+                val commentStart = source.indexOf(';', startIndex = lineStart)
+                if (commentStart != -1 && commentStart < lineEnd) {
+                    tokens += CollectedToken(
+                        line = lineIndex,
+                        char = commentStart - lineStart,
+                        length = lineEnd - commentStart,
+                        typeIndex = COMMENT,
+                    )
+                }
+
+                if (lineEnd == source.length) break
+                val nextStart = when {
+                    lineEnd + 1 < source.length && source[lineEnd] == '\r' && source[lineEnd + 1] == '\n' -> lineEnd + 2
+                    else -> lineEnd + 1
+                }
+                lineStart = nextStart
+                lineIndex += 1
+            }
+        }
+
         private fun emitKeyword(node: TerminalNode?) {
             emit(node, KEYWORD)
         }
@@ -186,12 +213,13 @@ class SemanticTokensProvider(
     )
 
     companion object {
-        val TOKEN_TYPES = listOf("keyword", "function", "variable", "number")
+        val TOKEN_TYPES = listOf("keyword", "function", "variable", "number", "comment")
 
         private const val KEYWORD = 0
         private const val FUNCTION = 1
         private const val VARIABLE = 2
         private const val NUMBER = 3
+        private const val COMMENT = 4
     }
 }
 
