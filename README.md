@@ -67,7 +67,7 @@ Settings → Languages & Frameworks → Language Servers → click **+**
 | Field | Value |
 |---|---|
 | Name | Logo LSP |
-| Command | `java -jar /absolute/path/to/jb-logo-lsp-0.1.0-all.jar` |
+| Command | `java -jar /absolute/path/to/jb-logo-lsp-all.jar` |
 
 Use the full absolute path to the JAR.
 
