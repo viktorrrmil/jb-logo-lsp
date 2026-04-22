@@ -37,7 +37,7 @@ rather than syntax-level features.
 This produces:
 
 ```
-build/libs/jb-logo-lsp-0.1.0-all.jar
+build/libs/jb-logo-lsp-all.jar
 ```
 
 ---
@@ -45,7 +45,7 @@ build/libs/jb-logo-lsp-0.1.0-all.jar
 ## Running
 
 ```bash
-java -jar build/libs/jb-logo-lsp-0.1.0-all.jar
+java -jar build/libs/jb-logo-lsp-all.jar
 ```
 
 The server communicates over **stdio** (stdin/stdout). It blocks waiting for LSP messages — do not run it directly in a terminal. Connect it through an LSP client as described below.
