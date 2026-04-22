@@ -9,7 +9,7 @@ package dev.jb.logolsp;
 }
 
 program
-    : separator* statement (separator+ statement)* separator* EOF
+    : statement* EOF
     ;
 
 statement
@@ -24,7 +24,7 @@ statement
     ;
 
 procedureDefinition
-    : TO IDENT parameter* separator* statementList END
+    : TO IDENT parameter* statementList END
     ;
 
 parameter
@@ -72,11 +72,11 @@ comparator
     ;
 
 block
-    : LBRACK separator* statementList? separator* RBRACK
+    : LBRACK statementList? RBRACK
     ;
 
 statementList
-    : statement (separator+ statement)*
+    : statement*
     ;
 
 expressionStatement
@@ -154,9 +154,6 @@ quotedWord
     : QUOTED_WORD
     ;
 
-separator
-    : NEWLINE+
-    ;
 
 TO: 'TO';
 END: 'END';
@@ -203,13 +200,8 @@ COMMENT
     : ';' ~[\r\n]* -> skip
     ;
 
-NEWLINE
-    : '\r'? '\n'
-    ;
-
-WS
-    : [ \t\f]+ -> skip
-    ;
+NEWLINE : [\r\n]+ -> skip ;
+WS      : [ \t]+ -> skip ;
 
 fragment LETTER
     : [a-z_]

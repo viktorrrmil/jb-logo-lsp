@@ -11,61 +11,70 @@ import org.eclipse.lsp4j.DidSaveTextDocumentParams
 import org.eclipse.lsp4j.Location
 import org.eclipse.lsp4j.LocationLink
 import org.eclipse.lsp4j.Position
+import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.SemanticTokens
 import org.eclipse.lsp4j.SemanticTokensParams
 import org.eclipse.lsp4j.jsonrpc.messages.Either
+import org.eclipse.lsp4j.services.LanguageClient
 import org.eclipse.lsp4j.services.TextDocumentService
 import java.util.concurrent.CompletableFuture
 
 class LogoTextDocumentService(
     private val store: DocumentStore,
 ) : TextDocumentService {
+    var client: LanguageClient? = null
+
     override fun didOpen(params: DidOpenTextDocumentParams?) {
         params ?: return
         store.open(params.textDocument.uri, params.textDocument.text)
+        publishDiagnostics(params.textDocument.uri)
     }
 
     override fun didChange(params: DidChangeTextDocumentParams?) {
         params ?: return
         store.update(params.textDocument.uri, params.contentChanges.last().text)
+        publishDiagnostics(params.textDocument.uri)
     }
 
     override fun didClose(params: DidCloseTextDocumentParams?) {
         params ?: return
         store.close(params.textDocument.uri)
+        client?.publishDiagnostics(PublishDiagnosticsParams(params.textDocument.uri, emptyList()))
     }
 
     override fun didSave(params: DidSaveTextDocumentParams?) {
-        //TODO("Not yet implemented")
+        // No-op for now.
     }
 
     override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
-        System.err.println("SEMANTIC TOKENS REQUEST RECEIVED")
         val document = store.get(params.textDocument.uri)
-        val tokens = document?.let { SemanticTokensProvider(it.program, it.symbolTable).provide() } ?: SemanticTokens(emptyList())
+        val tokens = document?.let { SemanticTokensProvider(it.program).provide() }
+            ?: SemanticTokens(emptyList())
         return CompletableFuture.completedFuture(tokens)
     }
 
     override fun declaration(
         params: DeclarationParams,
     ): CompletableFuture<Either<List<Location>, List<LocationLink>>?> {
-        return CompletableFuture.completedFuture(resolveSymbolLocation(params.textDocument.uri, params.position.line, params.position.character))
+        return CompletableFuture.completedFuture(
+            resolveSymbolLocation(params.textDocument.uri, params.position.line, params.position.character),
+        )
     }
 
     override fun definition(
         params: DefinitionParams,
     ): CompletableFuture<Either<List<Location>, List<LocationLink>>?> {
-        return CompletableFuture.completedFuture(resolveSymbolLocation(params.textDocument.uri, params.position.line, params.position.character))
+        return CompletableFuture.completedFuture(
+            resolveSymbolLocation(params.textDocument.uri, params.position.line, params.position.character),
+        )
     }
 
     private fun symbolNameForDeclaration(token: TerminalNode): String? {
         val parent = token.parent
         return when {
             parent is LogoParser.VariableReferenceContext && token.symbol.type == LogoLexer.IDENT -> token.text
-            parent is LogoParser.VariableReferenceContext && token.symbol.type == LogoLexer.COLON -> {
-                parent.IDENT()?.text
-            }
+            parent is LogoParser.VariableReferenceContext && token.symbol.type == LogoLexer.COLON -> parent.IDENT()?.text
             parent is LogoParser.ProcedureCallContext && token.symbol.type == LogoLexer.IDENT -> token.text
             else -> null
         }
@@ -96,6 +105,11 @@ class LogoTextDocumentService(
         val start = Position(symbol.line - 1, symbol.char)
         val end = Position(symbol.line - 1, symbol.char + symbol.name.length)
         return Either.forLeft(listOf(Location(uri, Range(start, end))))
+    }
+
+    private fun publishDiagnostics(uri: String) {
+        val diagnostics = store.get(uri)?.let { DiagnosticEngine(it).provide() } ?: emptyList()
+        client?.publishDiagnostics(PublishDiagnosticsParams(uri, diagnostics))
     }
 }
 

@@ -1,12 +1,10 @@
-; tiny LOGO sample
+MAKE "step 50
 
-TO square :size
+TO square :side
   REPEAT 4 [
-	FORWARD :size
-	RIGHT 90
+    FORWARD :side
+    RIGHT 90
   ]
 END
 
-MAKE "step 50
 square :step
-

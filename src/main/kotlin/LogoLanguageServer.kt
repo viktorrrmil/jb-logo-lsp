@@ -16,7 +16,7 @@ import org.eclipse.lsp4j.services.WorkspaceService
 import java.util.concurrent.CompletableFuture
 
 class LogoLanguageServer : LanguageServer {
-    private lateinit var client: LanguageClient
+    private var client: LanguageClient? = null
     private val documentStore = DocumentStore()
     private val textDocumentService = LogoTextDocumentService(documentStore)
     private val workspaceService = LogoWorkspaceService()
@@ -53,6 +53,7 @@ class LogoLanguageServer : LanguageServer {
 
     fun connect(client: LanguageClient) {
         this.client = client
+        textDocumentService.client = client
     }
 }
 

@@ -38,7 +38,7 @@ class SymbolTableBuilder : LogoBaseVisitor<Unit>() {
                     name = name,
                     kind = SymbolKind.VARIABLE,
                     line = token.line,
-                    char = token.charPositionInLine,
+                    char = token.charPositionInLine + 1,
                 ),
             )
         }

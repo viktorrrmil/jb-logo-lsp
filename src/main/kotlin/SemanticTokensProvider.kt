@@ -6,17 +6,14 @@ import org.eclipse.lsp4j.SemanticTokens
 
 class SemanticTokensProvider(
     private val program: LogoParser.ProgramContext,
-    private val symbolTable: SymbolTable,
 ) {
     fun provide(): SemanticTokens {
-        val collector = TokenCollector(symbolTable)
+        val collector = TokenCollector()
         collector.visit(program)
         return collector.toSemanticTokens()
     }
 
-    private class TokenCollector(
-        private val symbolTable: SymbolTable,
-    ) : LogoBaseVisitor<Unit>() {
+    private class TokenCollector() : LogoBaseVisitor<Unit>() {
         private val tokens = mutableListOf<CollectedToken>()
 
         override fun visitProgram(ctx: LogoParser.ProgramContext) {
@@ -148,7 +145,7 @@ class SemanticTokensProvider(
 
         private fun emit(node: TerminalNode?, typeIndex: Int) {
             val token = node?.symbol ?: return
-            System.err.println("TOKEN: ${token.text} -> $typeIndex")
+//            System.err.println("TOKEN: ${token.text} -> $typeIndex")
             tokens += CollectedToken(
                 line = token.line - 1,
                 char = token.charPositionInLine,
