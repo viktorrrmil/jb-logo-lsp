@@ -46,3 +46,10 @@ tasks.compileKotlin {
 tasks.compileJava {
     dependsOn(tasks.generateGrammarSource)
 }
+
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    archiveBaseName.set("jb-logo-lsp")
+    archiveClassifier.set("all")
+    archiveVersion.set("")
+    mergeServiceFiles()
+}
