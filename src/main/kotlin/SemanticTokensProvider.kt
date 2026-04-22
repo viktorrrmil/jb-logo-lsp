@@ -64,42 +64,42 @@ class SemanticTokensProvider(
         }
 
         override fun visitForwardCommand(ctx: LogoParser.ForwardCommandContext) {
-            emitKeyword(ctx.FORWARD())
+            emitFunction(ctx.FORWARD())
             visitChildren(ctx)
         }
 
         override fun visitBackCommand(ctx: LogoParser.BackCommandContext) {
-            emitKeyword(ctx.BACK())
+            emitFunction(ctx.BACK())
             visitChildren(ctx)
         }
 
         override fun visitRightCommand(ctx: LogoParser.RightCommandContext) {
-            emitKeyword(ctx.RIGHT())
+            emitFunction(ctx.RIGHT())
             visitChildren(ctx)
         }
 
         override fun visitLeftCommand(ctx: LogoParser.LeftCommandContext) {
-            emitKeyword(ctx.LEFT())
+            emitFunction(ctx.LEFT())
             visitChildren(ctx)
         }
 
         override fun visitPenUpCommand(ctx: LogoParser.PenUpCommandContext) {
-            emitKeyword(ctx.PENUP())
+            emitFunction(ctx.PENUP())
             visitChildren(ctx)
         }
 
         override fun visitPenDownCommand(ctx: LogoParser.PenDownCommandContext) {
-            emitKeyword(ctx.PENDOWN())
+            emitFunction(ctx.PENDOWN())
             visitChildren(ctx)
         }
 
         override fun visitHomeCommand(ctx: LogoParser.HomeCommandContext) {
-            emitKeyword(ctx.HOME())
+            emitFunction(ctx.HOME())
             visitChildren(ctx)
         }
 
         override fun visitClearScreenCommand(ctx: LogoParser.ClearScreenCommandContext) {
-            emitKeyword(ctx.CLEARSCREEN())
+            emitFunction(ctx.CLEARSCREEN())
             visitChildren(ctx)
         }
 

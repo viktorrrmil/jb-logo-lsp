@@ -157,15 +157,36 @@ class LogoTextDocumentService(
         params: PrepareRenameParams,
     ): CompletableFuture<Either3<Range, PrepareRenameResult, PrepareRenameDefaultBehavior>?> {
         val document = store.get(params.textDocument.uri)
-            ?: throw noRenameableSymbol()
+            ?: return failedFuture("No renameable symbol at cursor")
         val token = tokenAtPosition(document.program, params.position.line, params.position.character)
-            ?: throw noRenameableSymbol()
+            ?: return failedFuture("No renameable symbol at cursor")
         val symbolName = symbolNameForDeclaration(token)
-            ?: throw noRenameableSymbol()
+            ?: return failedFuture("No renameable symbol at cursor")
         document.symbolTable.resolve(symbolName)
-            ?: throw noRenameableSymbol()
+            ?: return failedFuture("No renameable symbol at cursor")
 
-        return CompletableFuture.completedFuture(Either3.forFirst(tokenRange(token.symbol)))
+        val range = if (token.symbol.type == LogoLexer.QUOTED_WORD) {
+            val t = token.symbol
+            Range(
+                Position(t.line - 1, t.charPositionInLine + 1),
+                Position(t.line - 1, t.charPositionInLine + (t.text?.length ?: 0)),
+            )
+        } else {
+            tokenRange(token.symbol)
+        }
+        return CompletableFuture.completedFuture(Either3.forFirst(range))
+    }
+
+    private fun <T> failedFuture(message: String): CompletableFuture<T> {
+        val future = CompletableFuture<T>()
+        future.completeExceptionally(noRenameableSymbol(message))
+        return future
+    }
+
+    private fun noRenameableSymbol(message: String = "No renameable symbol at cursor"): ResponseErrorException {
+        return ResponseErrorException(
+            ResponseError(ResponseErrorCode.InvalidRequest, message, null)
+        )
     }
 
     private fun symbolNameForDeclaration(token: TerminalNode): String? {
