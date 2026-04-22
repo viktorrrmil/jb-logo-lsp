@@ -41,8 +41,9 @@ class LogoTextDocumentService(
     }
 
     override fun semanticTokensFull(params: SemanticTokensParams): CompletableFuture<SemanticTokens> {
+        System.err.println("SEMANTIC TOKENS REQUEST RECEIVED")
         val document = store.get(params.textDocument.uri)
-        val tokens = document?.let { SemanticTokensProvider(it.program).provide() } ?: SemanticTokens(emptyList())
+        val tokens = document?.let { SemanticTokensProvider(it.program, it.symbolTable).provide() } ?: SemanticTokens(emptyList())
         return CompletableFuture.completedFuture(tokens)
     }
 

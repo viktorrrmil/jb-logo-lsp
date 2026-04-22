@@ -6,14 +6,17 @@ import org.eclipse.lsp4j.SemanticTokens
 
 class SemanticTokensProvider(
     private val program: LogoParser.ProgramContext,
+    private val symbolTable: SymbolTable,
 ) {
     fun provide(): SemanticTokens {
-        val collector = TokenCollector()
+        val collector = TokenCollector(symbolTable)
         collector.visit(program)
         return collector.toSemanticTokens()
     }
 
-    private class TokenCollector : LogoBaseVisitor<Unit>() {
+    private class TokenCollector(
+        private val symbolTable: SymbolTable,
+    ) : LogoBaseVisitor<Unit>() {
         private val tokens = mutableListOf<CollectedToken>()
 
         override fun visitProgram(ctx: LogoParser.ProgramContext) {
@@ -62,47 +65,47 @@ class SemanticTokensProvider(
         }
 
         override fun visitForwardCommand(ctx: LogoParser.ForwardCommandContext) {
-            emitFunction(ctx.FORWARD())
+            emitKeyword(ctx.FORWARD())
             visitChildren(ctx)
         }
 
         override fun visitBackCommand(ctx: LogoParser.BackCommandContext) {
-            emitFunction(ctx.BACK())
+            emitKeyword(ctx.BACK())
             visitChildren(ctx)
         }
 
         override fun visitRightCommand(ctx: LogoParser.RightCommandContext) {
-            emitFunction(ctx.RIGHT())
+            emitKeyword(ctx.RIGHT())
             visitChildren(ctx)
         }
 
         override fun visitLeftCommand(ctx: LogoParser.LeftCommandContext) {
-            emitFunction(ctx.LEFT())
+            emitKeyword(ctx.LEFT())
             visitChildren(ctx)
         }
 
         override fun visitPenUpCommand(ctx: LogoParser.PenUpCommandContext) {
-            emitFunction(ctx.PENUP())
+            emitKeyword(ctx.PENUP())
             visitChildren(ctx)
         }
 
         override fun visitPenDownCommand(ctx: LogoParser.PenDownCommandContext) {
-            emitFunction(ctx.PENDOWN())
+            emitKeyword(ctx.PENDOWN())
             visitChildren(ctx)
         }
 
         override fun visitHomeCommand(ctx: LogoParser.HomeCommandContext) {
-            emitFunction(ctx.HOME())
+            emitKeyword(ctx.HOME())
             visitChildren(ctx)
         }
 
         override fun visitClearScreenCommand(ctx: LogoParser.ClearScreenCommandContext) {
-            emitFunction(ctx.CLEARSCREEN())
+            emitKeyword(ctx.CLEARSCREEN())
             visitChildren(ctx)
         }
 
         override fun visitQuotedWord(ctx: LogoParser.QuotedWordContext) {
-            emitString(ctx.QUOTED_WORD())
+            emitVariableFromQuoted(ctx.QUOTED_WORD())
         }
 
         private fun emitKeyword(node: TerminalNode?) {
@@ -113,8 +116,14 @@ class SemanticTokensProvider(
             emit(node, FUNCTION)
         }
 
-        private fun emitString(node: TerminalNode?) {
-            emit(node, STRING)
+        private fun emitVariableFromQuoted(node: TerminalNode?) {
+            val token = node?.symbol ?: return
+            tokens += CollectedToken(
+                line = token.line - 1,
+                char = token.charPositionInLine,
+                length = token.text?.length ?: 0,
+                typeIndex = VARIABLE,
+            )
         }
 
         private fun emitNumber(token: Token?) {
@@ -139,6 +148,7 @@ class SemanticTokensProvider(
 
         private fun emit(node: TerminalNode?, typeIndex: Int) {
             val token = node?.symbol ?: return
+            System.err.println("TOKEN: ${token.text} -> $typeIndex")
             tokens += CollectedToken(
                 line = token.line - 1,
                 char = token.charPositionInLine,
@@ -148,7 +158,9 @@ class SemanticTokensProvider(
         }
 
         fun toSemanticTokens(): SemanticTokens {
-            val sortedTokens = tokens.sortedWith(compareBy<CollectedToken> { it.line }.thenBy { it.char })
+            val sortedTokens = tokens
+                .distinctBy { Triple(it.line, it.char, it.typeIndex) }
+                .sortedWith(compareBy<CollectedToken> { it.line }.thenBy { it.char })
             val data = ArrayList<Int>(sortedTokens.size * 5)
             var previousLine = 0
             var previousChar = 0
@@ -177,13 +189,12 @@ class SemanticTokensProvider(
     )
 
     companion object {
-        val TOKEN_TYPES = listOf("keyword", "function", "variable", "string", "number")
+        val TOKEN_TYPES = listOf("keyword", "function", "variable", "number")
 
         private const val KEYWORD = 0
         private const val FUNCTION = 1
         private const val VARIABLE = 2
-        private const val STRING = 3
-        private const val NUMBER = 4
+        private const val NUMBER = 3
     }
 }
 

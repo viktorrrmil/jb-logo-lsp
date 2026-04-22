@@ -32,7 +32,7 @@ parameter
     ;
 
 procedureCall
-    : IDENT argument+
+    : IDENT argument*
     ;
 
 argument
