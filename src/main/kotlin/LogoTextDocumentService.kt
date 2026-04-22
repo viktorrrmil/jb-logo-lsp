@@ -109,13 +109,13 @@ class LogoTextDocumentService(
         val procedureName = procedure.IDENT()?.text ?: return CompletableFuture.completedFuture(emptyList())
         val currentOrder = procedure.parameter().mapNotNull { it.variableReference()?.IDENT()?.text }
 
-        val swappedOrder = currentOrder.reversed()
+        val reversedOrder = currentOrder.reversed()
         val command = Command(
-            "Change Signature: Swap Parameter Order",
+            "Change Signature: Reverse Parameter Order",
             "logo.changeSignature",
-            listOf(uri, procedureName, swappedOrder)
+            listOf(uri, procedureName, reversedOrder)
         )
-        val action = CodeAction("Change Signature: Swap Parameter Order").apply {
+        val action = CodeAction("Change Signature: Reverse Parameter Order").apply {
             kind = CodeActionKind.Refactor
             this.command = command
         }
@@ -284,32 +284,6 @@ class LogoTextDocumentService(
             current = current.parent
         }
         return null
-    }
-
-    private fun findProcedureByParameterPosition(
-        tree: ParseTree,
-        line: Int,
-        char: Int,
-    ): LogoParser.ProcedureDefinitionContext? {
-        var result: LogoParser.ProcedureDefinitionContext? = null
-        object : LogoBaseVisitor<Unit>() {
-            override fun visitProcedureDefinition(ctx: LogoParser.ProcedureDefinitionContext) {
-                val parameters = ctx.parameter()
-                if (parameters.isEmpty()) {
-                    visitChildren(ctx)
-                    return
-                }
-
-                val first = parameters.first().start
-                val last = parameters.last().stop
-                if (first != null && last != null && containsPosition(first, last, line, char)) {
-                    result = ctx
-                    return
-                }
-                visitChildren(ctx)
-            }
-        }.visit(tree)
-        return result
     }
 
     private fun containsPosition(start: Token, stop: Token, line: Int, char: Int): Boolean {
