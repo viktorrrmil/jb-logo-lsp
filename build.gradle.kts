@@ -1,16 +1,9 @@
 plugins {
     kotlin("jvm") version "1.9.22"
     antlr
-    id("com.gradleup.shadow") version "9.3.0"
     application
+    id("com.gradleup.shadow") version "9.3.0"
 }
-
-application {
-    mainClass.set("dev.jb.logolsp.MainKt")
-}
-
-group = "dev.jb"
-version = "0.1.0"
 
 repositories {
     mavenCentral()
@@ -20,26 +13,36 @@ dependencies {
     antlr("org.antlr:antlr4:4.13.1")
     implementation("org.antlr:antlr4-runtime:4.13.1")
     implementation("org.eclipse.lsp4j:org.eclipse.lsp4j:0.21.1")
-    implementation(kotlin("stdlib"))
 }
 
-tasks.generateGrammarSource {
-    arguments = arguments + listOf("-visitor", "-no-listener", "-Xexact-output-dir")
-    outputDirectory = file("${layout.buildDirectory.get()}/generated-src/antlr/main")
+application {
+    mainClass.set("dev.jb.logolsp.MainKt")
 }
 
-tasks.shadowJar {
-    mergeServiceFiles()
-}
-
-kotlin {
-    sourceSets {
-        main {
-            kotlin.srcDirs(
-                "src/main/kotlin",
-                "${layout.buildDirectory.get()}/generated-src/antlr/main"
-            )
-        }
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
+tasks.generateGrammarSource {
+    arguments = listOf("-visitor", "-no-listener")
+}
+
+sourceSets {
+    main {
+        java.srcDir(layout.buildDirectory.dir("generated-src/antlr/main"))
+    }
+}
+
+tasks.compileKotlin {
+    dependsOn(tasks.generateGrammarSource)
+}
+
+tasks.compileJava {
+    dependsOn(tasks.generateGrammarSource)
+}
