@@ -3,6 +3,10 @@ package dev.jb.logolsp
 import org.antlr.v4.runtime.Token
 import org.antlr.v4.runtime.tree.ParseTree
 import org.antlr.v4.runtime.tree.TerminalNode
+import org.eclipse.lsp4j.CodeAction
+import org.eclipse.lsp4j.CodeActionKind
+import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.Command
 import org.eclipse.lsp4j.DeclarationParams
 import org.eclipse.lsp4j.DefinitionParams
 import org.eclipse.lsp4j.DidChangeTextDocumentParams
@@ -81,11 +85,60 @@ class LogoTextDocumentService(
         )
     }
 
+    override fun codeAction(params: CodeActionParams): CompletableFuture<List<Either<Command, CodeAction>>> {
+        val uri = params.textDocument.uri
+        val document = store.get(uri) ?: return CompletableFuture.completedFuture(emptyList())
+        val line = params.range.start.line
+        val char = params.range.start.character
+
+        // Find if cursor is on a parameter of a procedure definition
+        val token = tokenAtPosition(document.program, line, char)
+            ?: return CompletableFuture.completedFuture(emptyList())
+
+        val procedure = findEnclosingProcedure(document.program, token)
+            ?: return CompletableFuture.completedFuture(emptyList())
+
+        // Only show if cursor is actually on a parameter
+        val isOnParam = procedure.parameter().any { param ->
+            param.variableReference()?.IDENT()?.symbol?.let { t ->
+                t.line - 1 == line && t.charPositionInLine <= char && char < t.charPositionInLine + t.text.length
+            } == true
+        }
+        if (!isOnParam) return CompletableFuture.completedFuture(emptyList())
+
+        val procedureName = procedure.IDENT()?.text ?: return CompletableFuture.completedFuture(emptyList())
+        val currentOrder = procedure.parameter().mapNotNull { it.variableReference()?.IDENT()?.text }
+
+        val swappedOrder = currentOrder.reversed()
+        val command = Command(
+            "Change Signature: Swap Parameter Order",
+            "logo.changeSignature",
+            listOf(uri, procedureName, swappedOrder)
+        )
+        val action = CodeAction("Change Signature: Swap Parameter Order").apply {
+            kind = CodeActionKind.Refactor
+            this.command = command
+        }
+
+        return CompletableFuture.completedFuture(listOf(Either.forRight(action)))
+    }
+
     override fun rename(params: RenameParams): CompletableFuture<WorkspaceEdit?> {
         val document = store.get(params.textDocument.uri)
             ?: return CompletableFuture.completedFuture(null)
         val token = tokenAtPosition(document.program, params.position.line, params.position.character)
             ?: return CompletableFuture.completedFuture(null)
+
+        val parameterContext = parameterRenameContext(document.program, token)
+        if (parameterContext != null) {
+            val collector = ScopedParameterReferenceCollector(parameterContext.name, params.newName)
+            collector.visit(parameterContext.procedure)
+            val edits = mutableListOf<TextEdit>()
+            edits += TextEdit(tokenRange(parameterContext.parameterToken), params.newName)
+            edits += collector.edits
+            return CompletableFuture.completedFuture(WorkspaceEdit(mapOf(params.textDocument.uri to edits)))
+        }
+
         val symbolName = symbolNameForDeclaration(token)
             ?: return CompletableFuture.completedFuture(null)
         val symbol = document.symbolTable.resolve(symbolName)
@@ -148,6 +201,17 @@ class LogoTextDocumentService(
     private fun resolveSymbolLocation(uri: String, line: Int, char: Int): Either<List<Location>, List<LocationLink>>? {
         val document = store.get(uri) ?: return null
         val token = tokenAtPosition(document.program, line, char) ?: return null
+
+        val parameterContext = parameterRenameContext(document.program, token)
+        if (parameterContext != null) {
+            val start = Position(parameterContext.parameterToken.line - 1, parameterContext.parameterToken.charPositionInLine)
+            val end = Position(
+                parameterContext.parameterToken.line - 1,
+                parameterContext.parameterToken.charPositionInLine + (parameterContext.parameterToken.text?.length ?: 0),
+            )
+            return Either.forLeft(listOf(Location(uri, Range(start, end))))
+        }
+
         val symbolName = symbolNameForDeclaration(token) ?: return null
         val symbol = document.symbolTable.resolve(symbolName) ?: return null
 
@@ -165,6 +229,77 @@ class LogoTextDocumentService(
         val start = Position(token.line - 1, token.charPositionInLine)
         val end = Position(token.line - 1, token.charPositionInLine + (token.text?.length ?: 0))
         return Range(start, end)
+    }
+
+    private fun parameterRenameContext(
+        tree: ParseTree,
+        target: TerminalNode,
+    ): ParameterRenameContext? {
+        val variableReference = target.parent as? LogoParser.VariableReferenceContext ?: return null
+        val parameter = variableReference.parent as? LogoParser.ParameterContext ?: return null
+        val procedure = findEnclosingProcedure(tree, target) ?: return null
+        if (!procedure.parameter().contains(parameter)) return null
+
+        val parameterToken = variableReference.IDENT()?.symbol ?: return null
+        return ParameterRenameContext(
+            procedure = procedure,
+            parameterToken = parameterToken,
+            name = parameterToken.text,
+        )
+    }
+
+    private fun findEnclosingProcedure(
+        tree: ParseTree,
+        target: TerminalNode,
+    ): LogoParser.ProcedureDefinitionContext? {
+        var current: ParseTree? = target
+        while (current != null) {
+            if (current is LogoParser.ProcedureDefinitionContext) {
+                return current
+            }
+            if (current == tree) {
+                break
+            }
+            current = current.parent
+        }
+        return null
+    }
+
+    private fun findProcedureByParameterPosition(
+        tree: ParseTree,
+        line: Int,
+        char: Int,
+    ): LogoParser.ProcedureDefinitionContext? {
+        var result: LogoParser.ProcedureDefinitionContext? = null
+        object : LogoBaseVisitor<Unit>() {
+            override fun visitProcedureDefinition(ctx: LogoParser.ProcedureDefinitionContext) {
+                val parameters = ctx.parameter()
+                if (parameters.isEmpty()) {
+                    visitChildren(ctx)
+                    return
+                }
+
+                val first = parameters.first().start
+                val last = parameters.last().stop
+                if (first != null && last != null && containsPosition(first, last, line, char)) {
+                    result = ctx
+                    return
+                }
+                visitChildren(ctx)
+            }
+        }.visit(tree)
+        return result
+    }
+
+    private fun containsPosition(start: Token, stop: Token, line: Int, char: Int): Boolean {
+        val startLine = start.line - 1
+        val endLine = stop.line - 1
+        val endChar = stop.charPositionInLine + (stop.text?.length ?: 0)
+
+        if (line < startLine || line > endLine) return false
+        if (line == startLine && char < start.charPositionInLine) return false
+        if (line == endLine && char > endChar) return false
+        return true
     }
 
     private fun noRenameableSymbol(): ResponseErrorException {
@@ -264,4 +399,37 @@ class LogoTextDocumentService(
             visitChildren(ctx)
         }
     }
+
+    private class ScopedParameterReferenceCollector(
+        private val parameterName: String,
+        private val newName: String,
+    ) : LogoBaseVisitor<Unit>() {
+        val edits = mutableListOf<TextEdit>()
+
+        override fun visitVariableReference(ctx: LogoParser.VariableReferenceContext) {
+            if (ctx.parent is LogoParser.ParameterContext) {
+                visitChildren(ctx)
+                return
+            }
+
+            val ident = ctx.IDENT()?.symbol ?: return
+            if (ident.text.equals(parameterName, ignoreCase = true)) {
+                edits += TextEdit(
+                    Range(
+                        Position(ident.line - 1, ident.charPositionInLine),
+                        Position(ident.line - 1, ident.charPositionInLine + (ident.text?.length ?: 0)),
+                    ),
+                    newName,
+                )
+            }
+
+            visitChildren(ctx)
+        }
+    }
+
+    private data class ParameterRenameContext(
+        val procedure: LogoParser.ProcedureDefinitionContext,
+        val parameterToken: Token,
+        val name: String,
+    )
 }

@@ -1,10 +1,17 @@
-MAKE "step 50
-
-TO square :side
-  REPEAT 4 [
-    FORWARD :side
-    RIGHT 90
-  ]
+TO rectangle :width :height
+  FORWARD :width
+  RIGHT 90
+  FORWARD :height
+  RIGHT 90
+  FORWARD :width
+  RIGHT 90
+  FORWARD :height
 END
 
-square :step
+TO draw :width :height
+  rectangle :width :height
+END
+
+rectangle 100 50
+rectangle 200 80
+draw 100 50
